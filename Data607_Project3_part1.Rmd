@@ -1,0 +1,82 @@
+---
+title: "Data607_Project3_Part1"
+author: "aw"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Project 3: Overview
+
+Over the last decade, birth rate trends have emerged as a significant topic amid global economic uncertainty, wealth inequality, climate change, urbanization, and an ever-changing geopolitical landscape. Should we be more concerned about overpopulation or a population plateau? Will the increasing costs of child-rearing deter people from having children altogether? These are critical questions we aim to explore in this project.
+
+For this analysis, we focus on fertility rates across a carefully selected set of countries. Using data from the World Bank (births per 1,000 people and per woman), we will compare fertility trends with other key indicators such as GDP, death rate, and urbanization. The goal is to uncover interesting correlations that can contribute to the discussion on population dynamics and economic factors.
+
+**Countries:**\
+Niger, Japan, US, China, Benin, Angola, Czech Republic, Italy, Egypt, Bangladesh, South Korea
+
+## Group Members, Collaboration Tools, Data Sources
+
+**Project Group:**\
+Ahmed Hassan, Zach Rose, Amish Rasheed, Robert Green, Allie Wrubel
+
+**Collaboration Tools:\
+**To facilitate communication and efficient teamwork, we will utilize several collaboration tools throughout the project. **Slack** will serve as our primary communication platform, allowing for real-time discussions and file sharing. **Email** for formal communication and sharing larger documents or updates. **Google Colab** for collaboratively developing and running R scripts. All files will be stored in a shared public repository on GitHub \<[https://github.com/awrubes/Data607_project3](https://github.com/awrubes/Data607_project3/tree/main){.uri}\>.
+
+**Data Sources:**\
+Datasets are sourced from the World Bank Group website \<[https://www.worldbank.org](https://www.worldbank.org/en/home){.uri}\>
+
+Birth Rate \<<https://github.com/awrubes/Data607_project3/tree/main/data/birth_rate>\>\
+Death Rate \<<https://github.com/awrubes/Data607_project3/tree/main/data/death_rate>\>\
+Fertility Replacement Rate \<<https://github.com/awrubes/Data607_project3/tree/main/data/fertility_replacement_rate>\>\
+GDP \<<https://github.com/awrubes/Data607_project3/tree/main/data/gdp>\>\
+Population \<<https://github.com/awrubes/Data607_project3/tree/main/data/population>\>\
+Urbanization \<<https://github.com/awrubes/Data607_project3/tree/main/data/urbanization>\>
+
+## Loading Data
+
+All of our data is available as csv files in a public GitHub repository. In order to import the data using the below R script you must clone the github repo to your local computer.
+
+```{r libs, include = TRUE, message=FALSE}
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(httr)
+library(purrr)
+library(readr)
+```
+
+```{r import}
+
+read_and_clean_csv_files <- function(data_directory, pattern, suffix) {
+  csv_files <- list.files(path = data_directory, pattern = pattern, full.names = TRUE)
+  
+  read_and_clean_csv <- function(file) {
+    country_name <- gsub(suffix, "", basename(file))
+    country_name <- gsub("-", " ", country_name)
+    country_name <- str_to_title(country_name)
+    
+    df <- read.csv(file, stringsAsFactors = FALSE, sep = ",")
+    df$country_name <- country_name
+    
+    return(df)
+  }
+  
+  list_of_dfs <- map(csv_files, read_and_clean_csv)
+  combined_data <- bind_rows(list_of_dfs)
+  return(combined_data)
+}
+
+# Load different datasets using the generic function
+combined_birth_data <- read_and_clean_csv_files("data/birth_rate", "*.csv", "_birth_rate.csv")
+combined_death_data <- read_and_clean_csv_files("data/death_rate", "*.csv", "_death_rate.csv")
+combined_fertility_data <- read_and_clean_csv_files("data/fertility_replacement_rate", "*.csv", "_fertility_replacement_rate.csv")
+combined_gdp_data <- read_and_clean_csv_files("data/gdp", "*.csv", "-gdp-gross-domestic-product.csv")
+combined_population_data <- read_and_clean_csv_files("data/population", "*.csv", "-population-2024-10-12.csv")
+combined_urbanization_data <- read_and_clean_csv_files("data/urbanization", "*.csv", "-urban-population.csv")
+
+
+```
