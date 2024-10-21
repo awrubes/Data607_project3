@@ -2,6 +2,7 @@
 title: "Data607_Project3_Part1"
 author: "aw"
 date: "`r Sys.Date()`"
+output:
 output: html_document
 ---
 
@@ -162,8 +163,6 @@ Death Rate
 
 combined_death_data$date <- as.Date(combined_death_data$date, format = "%Y-%m-%d")
 
-print(combined_death_data)
-
 combined_death_data <- combined_death_data %>%
   filter(!is.na(date) & !is.na(Deaths.per.1000.People) & 
          date >= as.Date("1950-12-31") & date <= as.Date("2024-12-31"))
@@ -178,7 +177,6 @@ plot_country_trends <- function(df, x_column, y_column, title, x_label, y_label)
     theme(legend.title = element_blank())
 }
 
-# Plot death rate trends with filtered data
 death_rate_plot <- plot_country_trends(
   df = combined_death_data,
   x_column = "date",          
@@ -236,7 +234,7 @@ plot_country_trends <- function(df, x_column, y_column, title, x_label, y_label)
     geom_point(size = 1.5) +  
     labs(title = title, x = x_label, y = y_label) +
     scale_x_date(date_breaks = "10 years", date_labels = "%Y") +  
-    scale_y_continuous(labels = function(x) paste0(x / 1e3, "B")) +  # Format y-axis in billions
+    scale_y_continuous(labels = function(x) paste0(x / 1e3, "B")) +  
     theme_minimal() +
     theme(legend.title = element_blank())
 }
@@ -350,8 +348,8 @@ plot_country_trends <- function(df, x_column, y_column, title, x_label, y_label,
     labs(title = title, x = x_label, y = y_label) +
     scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
     scale_y_continuous(
-      breaks = seq(0, max(df[[y_column]], na.rm = TRUE), by = y_break),  # Custom y-axis breaks
-      labels = function(x) paste0(x / 1e6, "M")  # Format labels in millions for readability
+      breaks = seq(0, max(df[[y_column]], na.rm = TRUE), by = y_break),  
+      labels = function(x) paste0(x / 1e6, "M")  
     ) +
     theme_minimal() +
     theme(legend.title = element_blank())
@@ -384,7 +382,7 @@ rest_of_countries_urban_population_plot <- plot_country_trends(
   title = "Urban Population for Other Countries",
   x_label = "Year",
   y_label = "Urban Population (in Millions)",
-  y_break = 1e7  # Set y-axis breaks in increments of 10 million
+  y_break = 1e7 
 )
 
 print(china_urban_population_plot)
