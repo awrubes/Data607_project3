@@ -47,6 +47,9 @@ library(ggplot2)
 library(httr)
 library(purrr)
 library(readr)
+library(scales)
+library(lubridate)
+
 ```
 
 ```{r import}
@@ -78,17 +81,52 @@ combined_gdp_data <- read_and_clean_csv_files("data/gdp", "*.csv", "-gdp-gross-d
 combined_population_data <- read_and_clean_csv_files("data/population", "*.csv", "-population-2024-10-12.csv")
 combined_urbanization_data <- read_and_clean_csv_files("data/urbanization", "*.csv", "-urban-population.csv")
 
+global_population_data_df <- read.csv("data/population/world_population.csv", stringsAsFactors = FALSE, sep = ",")
+global_fertility_data_df <- read.csv("data/fertility_replacement_rate/world_fertility_rate.csv", stringsAsFactors = FALSE, sep = ",")
 
 ```
 
 
-Birth rates
+
+Global Data
 ```{r}
 
-library(lubridate)
+global_population_data_df$date <- as.Date(global_population_data_df$date, format = "%m/%d/%Y")
+
+ggplot(global_population_data_df, aes(x = date, y = Population)) +
+  geom_line(color = "blue") +
+  geom_point(color = "red") +  
+  labs(title = "Global Population Over Time", 
+       x = "Year", 
+       y = "Population (in Billions)") +
+  scale_y_continuous(
+    breaks = seq(1e9, 8e9, by = 1e9),  
+    labels = function(x) paste0(x / 1e9, "B") 
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  
+
+global_fertility_data_df$date <- as.Date(global_fertility_data_df$date, format = "%m/%d/%Y")
+
+ggplot(global_fertility_data_df, aes(x = date, y = Births.per.Woman)) +
+  geom_line(color = "green") +
+  geom_point(color = "red") +  
+  labs(title = "Global Fertility Rate Since 1950", 
+       x = "Year", 
+       y = "Births per Woman") +
+    scale_y_continuous(breaks = seq(min(global_fertility_data_df$Births.per.Woman), 
+                                  max(global_fertility_data_df$Births.per.Woman), 
+                                  by = 0.5)) +  
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  
+
+
+```
 
 
 
+Birth rates
+```{r}
 combined_birth_data$date <- as.Date(combined_birth_data$date, format = "%m/%d/%Y")
 
 
@@ -98,28 +136,24 @@ combined_birth_data <- combined_birth_data %>%
 plot_country_trends <- function(df, x_column, y_column, title, x_label, y_label) {
   ggplot(df, aes_string(x = x_column, y = y_column, color = "country_name", group = "country_name")) +
     geom_line(size = 1) +
-    geom_point(size = 1.5) +  # Add points to check the data
+    geom_point(size = 1.5) +  
     labs(title = title, x = x_label, y = y_label) +
     scale_x_date(date_breaks = "10 years", date_labels = "%Y", 
-                 limits = c(as.Date("1950-01-01"), as.Date("2024-12-31"))) +  # Set date limits
+                 limits = c(as.Date("1950-01-01"), as.Date("2024-12-31"))) +  
     theme_minimal() +
     theme(legend.title = element_blank())
 }
 
 birth_rate_plot <- plot_country_trends(
   df = combined_birth_data,
-  x_column = "date",           # Use the cleaned 'date' column
-  y_column = "Births.per.1000.People",  # Replace with actual birth rate column
-  title = "Birth Rate Trends by Country",
+  x_column = "date",           
+  y_column = "Births.per.1000.People", 
+  title = "Birth Rate by Country",
   x_label = "Year",
   y_label = "Births per 1000 People"
 )
 
-# Plot the result
 print(birth_rate_plot)
-
-
-
 
 ```
 
@@ -134,13 +168,12 @@ combined_death_data <- combined_death_data %>%
   filter(!is.na(date) & !is.na(Deaths.per.1000.People) & 
          date >= as.Date("1950-12-31") & date <= as.Date("2024-12-31"))
 
-# Plot function
 plot_country_trends <- function(df, x_column, y_column, title, x_label, y_label) {
   ggplot(df, aes_string(x = x_column, y = y_column, color = "country_name", group = "country_name")) +
     geom_line(size = 1) +
-    geom_point(size = 1.5) +  # Add points to check the data
+    geom_point(size = 1.5) +  
     labs(title = title, x = x_label, y = y_label) +
-    scale_x_date(date_breaks = "10 years", date_labels = "%Y") +  # No need for limits, already filtered
+    scale_x_date(date_breaks = "10 years", date_labels = "%Y") +  
     theme_minimal() +
     theme(legend.title = element_blank())
 }
@@ -148,14 +181,13 @@ plot_country_trends <- function(df, x_column, y_column, title, x_label, y_label)
 # Plot death rate trends with filtered data
 death_rate_plot <- plot_country_trends(
   df = combined_death_data,
-  x_column = "date",           # Use the cleaned 'date' column
-  y_column = "Deaths.per.1000.People",  # Replace with actual death rate column
-  title = "Death Rate Trends by Country",
+  x_column = "date",          
+  y_column = "Deaths.per.1000.People", 
+  title = "Death Rate by Country",
   x_label = "Year",
   y_label = "Deaths per 1000 People"
 )
 
-# Plot the result
 print(death_rate_plot)
 
 ```
@@ -163,110 +195,133 @@ print(death_rate_plot)
 
 fertility rate
 ```{r}
-
-# Ensure the date column is in Date format
 combined_fertility_data$date <- as.Date(combined_fertility_data$date, format = "%Y-%m-%d")
 
-# Filter out rows with missing values and only keep dates between 1950 and 2024
 combined_fertility_data <- combined_fertility_data %>%
   filter(!is.na(date) & !is.na(Births.per.Woman) & 
          date >= as.Date("1950-01-01") & date <= as.Date("2024-12-31"))
 
-# Plot function for fertility data
 plot_country_trends <- function(df, x_column, y_column, title, x_label, y_label) {
   ggplot(df, aes_string(x = x_column, y = y_column, color = "country_name", group = "country_name")) +
     geom_line(size = 1) +
-    geom_point(size = 1.5) +  # Add points to check the data
+    geom_point(size = 1.5) +  
     labs(title = title, x = x_label, y = y_label) +
-    scale_x_date(date_breaks = "10 years", date_labels = "%Y") +  # No need for limits, already filtered
+    scale_x_date(date_breaks = "10 years", date_labels = "%Y") +  
     theme_minimal() +
     theme(legend.title = element_blank())
 }
 
-# Plot fertility rate trends with filtered data
 fertility_rate_plot <- plot_country_trends(
   df = combined_fertility_data,
-  x_column = "date",           # Use the cleaned 'date' column
-  y_column = "Births.per.Woman",  # Replace with actual fertility rate column
-  title = "Fertility Rate Trends by Country",
+  x_column = "date",           
+  y_column = "Births.per.Woman", 
+  title = "Fertility Rate by Country",
   x_label = "Year",
   y_label = "Births per Woman"
 )
 
-# Plot the result
 print(fertility_rate_plot)
 
 ```
-gdp
+GDP
 ```{r}
-
-# Ensure the date column is in Date format
 combined_gdp_data$date <- as.Date(combined_gdp_data$date, format = "%Y-%m-%d")
-# Filter out rows with missing values and only keep dates between 1950 and 2024
 combined_gdp_data <- combined_gdp_data %>%
   filter(!is.na(date) & !is.na(GDP...Billions.of.US...) & 
          date >= as.Date("1950-01-01") & date <= as.Date("2024-12-31"))
 
-# Plot function for GDP data
 plot_country_trends <- function(df, x_column, y_column, title, x_label, y_label) {
   ggplot(df, aes_string(x = x_column, y = y_column, color = "country_name", group = "country_name")) +
     geom_line(size = 1) +
-    geom_point(size = 1.5) +  # Add points to check the data
+    geom_point(size = 1.5) +  
     labs(title = title, x = x_label, y = y_label) +
-    scale_x_date(date_breaks = "10 years", date_labels = "%Y") +  # No need for limits, already filtered
+    scale_x_date(date_breaks = "10 years", date_labels = "%Y") +  
+    scale_y_continuous(labels = function(x) paste0(x / 1e3, "B")) +  # Format y-axis in billions
     theme_minimal() +
     theme(legend.title = element_blank())
 }
 
-# Plot GDP trends with filtered data
-gdp_trend_plot <- plot_country_trends(
-  df = combined_gdp_data,
-  x_column = "date",              # Use the cleaned 'date' column
-  y_column = "GDP...Billions.of.US...",  # Replace with actual GDP column name
-  title = "GDP Trends by Country",
+
+
+advanced_economies <- combined_gdp_data %>%
+  filter(country_name %in% c("United States", "China", "Japan", "Italy", "South Korea"))
+
+gdp_other_countries <- combined_gdp_data %>%
+  filter(!country_name %in% c("United States", "China", "Japan", "Italy", "South Korea"))
+
+advanced_economies_plot <- plot_country_trends(
+  df = advanced_economies,
+  x_column = "date",             
+  y_column = "GDP...Billions.of.US...",  
+  title = "GDP for USA, China, Japan, Italy, and South Korea",
   x_label = "Year",
   y_label = "GDP in Billions of US Dollars"
 )
 
-# Plot the result
-print(gdp_trend_plot)
+gdp_other_countries_plot <- plot_country_trends(
+  df = gdp_other_countries,
+  x_column = "date",             
+  y_column = "GDP...Billions.of.US...",  
+  title = "GDP for Other Countries",
+  x_label = "Year",
+  y_label = "GDP in Billions of US Dollars"
+)
+
+print(advanced_economies_plot)
+print(gdp_other_countries_plot)
+
 
 ```
 
 population
 ```{r}
 
-# Ensure the date column is in Date format
 combined_population_data$date <- as.Date(combined_population_data$date, format = "%Y-%m-%d")
 
-# Filter out rows with missing values and only keep dates between 1950 and 2024
 combined_population_data <- combined_population_data %>%
   filter(!is.na(date) & !is.na(Population) & 
          date >= as.Date("1950-01-01") & date <= as.Date("2024-12-31"))
 
-# Plot function for population data
+china_population_data <- combined_population_data %>%
+  filter(country_name == "China")
+
+rest_of_countries_population_data <- combined_population_data %>%
+  filter(country_name != "China")
+
 plot_country_trends <- function(df, x_column, y_column, title, x_label, y_label) {
   ggplot(df, aes_string(x = x_column, y = y_column, color = "country_name", group = "country_name")) +
     geom_line(size = 1) +
-    geom_point(size = 1.5) +  # Add points to check the data
+    geom_point(size = 1.5) +  
     labs(title = title, x = x_label, y = y_label) +
-    scale_x_date(date_breaks = "10 years", date_labels = "%Y") +  # No need for limits, already filtered
+    scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
+    scale_y_continuous(
+      breaks = seq(0, max(df[[y_column]], na.rm = TRUE), by = 50e6),   
+      labels = function(x) paste0(x / 1e6, "M")  
+    ) +
     theme_minimal() +
     theme(legend.title = element_blank())
 }
 
-# Plot population trends with filtered data
-population_trend_plot <- plot_country_trends(
-  df = combined_population_data,
-  x_column = "date",             # Use the cleaned 'date' column
-  y_column = "Population",       # Use Population column
-  title = "Population Trends by Country",
+china_population_plot <- plot_country_trends(
+  df = china_population_data,
+  x_column = "date",             
+  y_column = "Population",      
+  title = "Population for China",
   x_label = "Year",
-  y_label = "Population"
+  y_label = "Population (in Millions)"
 )
 
-# Plot the result
-print(population_trend_plot)
+rest_of_countries_population_plot <- plot_country_trends(
+  df = rest_of_countries_population_data,
+  x_column = "date",             
+  y_column = "Population",      
+  title = "Population for Other Countries",
+  x_label = "Year",
+  y_label = "Population (in Millions)"
+)
+
+print(china_population_plot)
+print(rest_of_countries_population_plot)
 
 
 ```
@@ -274,37 +329,67 @@ print(population_trend_plot)
 urbanization
 ```{r}
 
-# Ensure the date column is in Date format
 combined_urbanization_data$date <- as.Date(combined_urbanization_data$date, format = "%Y-%m-%d")
 
-# Filter out rows with missing values and only keep dates between 1950 and 2024
 combined_urbanization_data <- combined_urbanization_data %>%
   filter(!is.na(date) & !is.na(Urban.Population) & 
          date >= as.Date("1950-01-01") & date <= as.Date("2024-12-31"))
+china_urbanization_data <- combined_urbanization_data %>%
+  filter(country_name == "China")
 
-# Plot function for urbanization data
-plot_country_trends <- function(df, x_column, y_column, title, x_label, y_label) {
+japan_usa_urbanization_data <- combined_urbanization_data %>%
+  filter(country_name %in% c("Japan", "United States"))
+
+rest_of_countries_urbanization_data <- combined_urbanization_data %>%
+  filter(!country_name %in% c("China", "Japan", "United States"))
+
+plot_country_trends <- function(df, x_column, y_column, title, x_label, y_label, y_break) {
   ggplot(df, aes_string(x = x_column, y = y_column, color = "country_name", group = "country_name")) +
     geom_line(size = 1) +
-    geom_point(size = 1.5) +  # Add points to check the data
+    geom_point(size = 1.5) +  
     labs(title = title, x = x_label, y = y_label) +
-    scale_x_date(date_breaks = "10 years", date_labels = "%Y") +  # No need for limits, already filtered
+    scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
+    scale_y_continuous(
+      breaks = seq(0, max(df[[y_column]], na.rm = TRUE), by = y_break),  # Custom y-axis breaks
+      labels = function(x) paste0(x / 1e6, "M")  # Format labels in millions for readability
+    ) +
     theme_minimal() +
     theme(legend.title = element_blank())
 }
 
-# Plot urban population trends with filtered data
-urban_population_trend_plot <- plot_country_trends(
-  df = combined_urbanization_data,
-  x_column = "date",                 # Use the cleaned 'date' column
-  y_column = "Urban.Population",      # Use Urban Population column
-  title = "Urban Population Trends by Country",
+china_urban_population_plot <- plot_country_trends(
+  df = china_urbanization_data,
+  x_column = "date",             
+  y_column = "Urban.Population",      
+  title = "Urban Population for China",
   x_label = "Year",
-  y_label = "Urban Population"
+  y_label = "Urban Population (in Millions)",
+  y_break = 1e8  
 )
 
-# Plot the result
-print(urban_population_trend_plot)
+japan_usa_urban_population_plot <- plot_country_trends(
+  df = japan_usa_urbanization_data,
+  x_column = "date",             
+  y_column = "Urban.Population",      
+  title = "Urban Population for Japan and USA",
+  x_label = "Year",
+  y_label = "Urban Population (in Millions)",
+  y_break = 5e7  
+)
+
+rest_of_countries_urban_population_plot <- plot_country_trends(
+  df = rest_of_countries_urbanization_data,
+  x_column = "date",             
+  y_column = "Urban.Population",      
+  title = "Urban Population for Other Countries",
+  x_label = "Year",
+  y_label = "Urban Population (in Millions)",
+  y_break = 1e7  # Set y-axis breaks in increments of 10 million
+)
+
+print(china_urban_population_plot)
+print(japan_usa_urban_population_plot)
+print(rest_of_countries_urban_population_plot)
 
 
 ```
