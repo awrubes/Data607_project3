@@ -1,0 +1,657 @@
+---
+title: "Data607_Project3_Part1"
+author: "aw"
+date: "`r Sys.Date()`"
+output:
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Project 3: Overview
+
+Over the last decade, birth rate trends have emerged as a significant topic amid global economic uncertainty, wealth inequality, climate change, urbanization, and an ever-changing geopolitical landscape. Should we be more concerned about overpopulation or a population plateau? Will the increasing costs of child-rearing deter people from having children altogether? These are critical questions we aim to explore in this project.
+
+For this analysis, we focus on fertility rates across a carefully selected set of countries. Using data from the World Bank (births per 1,000 people and per woman), we will compare fertility trends with other key indicators such as GDP, death rate, and urbanization. The goal is to uncover interesting correlations that can contribute to the discussion on population dynamics and economic factors.
+
+**Countries:**\
+Niger, Japan, US, China, Benin, Angola, Czech Republic, Italy, Egypt, Bangladesh, South Korea
+
+## Group Members, Collaboration Tools, Data Sources
+
+**Project Group:**\
+Ahmed Hassan, Zach Rose, Amish Rasheed, Robert Green, Allie Wrubel
+
+**Collaboration Tools:\
+**To facilitate communication and efficient teamwork, we will utilize several collaboration tools throughout the project. **Slack** will serve as our primary communication platform, allowing for real-time discussions and file sharing. **Email** for formal communication and sharing larger documents or updates. **Google Colab** for collaboratively developing and running R scripts. All files will be stored in a shared public repository on GitHub \<[https://github.com/awrubes/Data607_project3](https://github.com/awrubes/Data607_project3/tree/main){.uri}\>.
+
+**Data Sources:**\
+Datasets are sourced from the World Bank Group website \<[https://www.worldbank.org](https://www.worldbank.org/en/home){.uri}\>
+
+Birth Rate \<<https://github.com/awrubes/Data607_project3/tree/main/data/birth_rate>\>\
+Death Rate \<<https://github.com/awrubes/Data607_project3/tree/main/data/death_rate>\>\
+Fertility Replacement Rate \<<https://github.com/awrubes/Data607_project3/tree/main/data/fertility_replacement_rate>\>\
+GDP \<<https://github.com/awrubes/Data607_project3/tree/main/data/gdp>\>\
+Population \<<https://github.com/awrubes/Data607_project3/tree/main/data/population>\>\
+Urbanization \<<https://github.com/awrubes/Data607_project3/tree/main/data/urbanization>\>
+
+## Loading Data
+
+All of our data is available as csv files in a public GitHub repository. In order to import the data using the below R script you must clone the github repo to your local computer.
+
+```{r libs, include = TRUE, message=FALSE}
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(httr)
+library(purrr)
+library(readr)
+library(scales)
+library(lubridate)
+```
+
+```{r import}
+read_and_clean_csv_files <- function(data_directory, pattern, suffix) {
+  csv_files <- list.files(path = data_directory, pattern = pattern, full.names = TRUE)
+  
+  read_and_clean_csv <- function(file) {
+    country_name <- gsub(suffix, "", basename(file))
+    country_name <- gsub("-", " ", country_name)
+    country_name <- str_to_title(country_name)
+    
+    df <- read.csv(file, stringsAsFactors = FALSE, sep = ",")
+    df$country_name <- country_name
+    
+    return(df)
+  }
+  
+  list_of_dfs <- map(csv_files, read_and_clean_csv)
+  combined_data <- bind_rows(list_of_dfs)
+  return(combined_data)
+}
+
+# Load different datasets using the generic function
+combined_birth_data <- read_and_clean_csv_files("data/birth_rate", "*.csv", "_birth_rate.csv")
+combined_death_data <- read_and_clean_csv_files("data/death_rate", "*.csv", "_death_rate.csv")
+combined_fertility_data <- read_and_clean_csv_files("data/fertility_replacement_rate", "*.csv", "_fertility_replacement_rate.csv")
+combined_gdp_data <- read_and_clean_csv_files("data/gdp", "*.csv", "-gdp-gross-domestic-product.csv")
+combined_population_data <- read_and_clean_csv_files("data/population", "*.csv", "-population-2024-10-12.csv")
+combined_urbanization_data <- read_and_clean_csv_files("data/urbanization", "*.csv", "-urban-population.csv")
+
+
+global_population_data_df <- read.csv("data/population/world_population.csv", stringsAsFactors = FALSE, sep = ",")
+global_fertility_data_df <- read.csv("data/fertility_replacement_rate/world_fertility_rate.csv", stringsAsFactors = FALSE, sep = ",")
+```
+
+
+Global Data
+```{r}
+
+global_population_data_df$date <- as.Date(global_population_data_df$date, format = "%m/%d/%Y")
+
+ggplot(global_population_data_df, aes(x = date, y = Population)) +
+  geom_line(color = "blue") +
+  geom_point(color = "red") +  
+  labs(title = "Global Population Over Time", 
+       x = "Year", 
+       y = "Population (in Billions)") +
+  scale_y_continuous(
+    breaks = seq(1e9, 8e9, by = 1e9),  
+    labels = function(x) paste0(x / 1e9, "B") 
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  
+
+global_fertility_data_df$date <- as.Date(global_fertility_data_df$date, format = "%m/%d/%Y")
+
+ggplot(global_fertility_data_df, aes(x = date, y = Births.per.Woman)) +
+  geom_line(color = "green") +
+  geom_point(color = "red") +  
+  labs(title = "Global Fertility Rate Since 1950", 
+       x = "Year", 
+       y = "Births per Woman") +
+    scale_y_continuous(breaks = seq(min(global_fertility_data_df$Births.per.Woman), 
+                                  max(global_fertility_data_df$Births.per.Woman), 
+                                  by = 0.5)) +  
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  
+
+
+```
+
+
+
+Birth rates
+```{r}
+combined_birth_data$date <- as.Date(combined_birth_data$date, format = "%m/%d/%Y")
+
+
+combined_birth_data <- combined_birth_data %>%
+  filter(!is.na(date) & !is.na(Births.per.1000.People))
+
+plot_country_trends <- function(df, x_column, y_column, title, x_label, y_label) {
+  ggplot(df, aes_string(x = x_column, y = y_column, color = "country_name", group = "country_name")) +
+    geom_line(size = 1) +
+    geom_point(size = 1.5) +  
+    labs(title = title, x = x_label, y = y_label) +
+    scale_x_date(date_breaks = "10 years", date_labels = "%Y", 
+                 limits = c(as.Date("1950-01-01"), as.Date("2024-12-31"))) +  
+    theme_minimal() +
+    theme(legend.title = element_blank())
+}
+
+birth_rate_plot <- plot_country_trends(
+  df = combined_birth_data,
+  x_column = "date",           
+  y_column = "Births.per.1000.People", 
+  title = "Birth Rate by Country",
+  x_label = "Year",
+  y_label = "Births per 1000 People"
+)
+
+print(birth_rate_plot)
+
+```
+
+Death Rate
+```{r}
+
+combined_death_data$date <- as.Date(combined_death_data$date, format = "%Y-%m-%d")
+
+combined_death_data <- combined_death_data %>%
+  filter(!is.na(date) & !is.na(Deaths.per.1000.People) & 
+         date >= as.Date("1950-12-31") & date <= as.Date("2024-12-31"))
+
+plot_country_trends <- function(df, x_column, y_column, title, x_label, y_label) {
+  ggplot(df, aes_string(x = x_column, y = y_column, color = "country_name", group = "country_name")) +
+    geom_line(size = 1) +
+    geom_point(size = 1.5) +  
+    labs(title = title, x = x_label, y = y_label) +
+    scale_x_date(date_breaks = "10 years", date_labels = "%Y") +  
+    theme_minimal() +
+    theme(legend.title = element_blank())
+}
+
+death_rate_plot <- plot_country_trends(
+  df = combined_death_data,
+  x_column = "date",          
+  y_column = "Deaths.per.1000.People", 
+  title = "Death Rate by Country",
+  x_label = "Year",
+  y_label = "Deaths per 1000 People"
+)
+
+print(death_rate_plot)
+
+```
+
+
+fertility rate
+```{r}
+combined_fertility_data$date <- as.Date(combined_fertility_data$date, format = "%Y-%m-%d")
+
+combined_fertility_data <- combined_fertility_data %>%
+  filter(!is.na(date) & !is.na(Births.per.Woman) & 
+         date >= as.Date("1950-01-01") & date <= as.Date("2024-12-31"))
+
+plot_country_trends <- function(df, x_column, y_column, title, x_label, y_label) {
+  ggplot(df, aes_string(x = x_column, y = y_column, color = "country_name", group = "country_name")) +
+    geom_line(size = 1) +
+    geom_point(size = 1.5) +  
+    labs(title = title, x = x_label, y = y_label) +
+    scale_x_date(date_breaks = "10 years", date_labels = "%Y") +  
+    theme_minimal() +
+    theme(legend.title = element_blank())
+}
+
+fertility_rate_plot <- plot_country_trends(
+  df = combined_fertility_data,
+  x_column = "date",           
+  y_column = "Births.per.Woman", 
+  title = "Fertility Rate by Country",
+  x_label = "Year",
+  y_label = "Births per Woman"
+)
+
+print(fertility_rate_plot)
+
+```
+GDP
+```{r}
+combined_gdp_data$date <- as.Date(combined_gdp_data$date, format = "%Y-%m-%d")
+combined_gdp_data <- combined_gdp_data %>%
+  filter(!is.na(date) & !is.na(GDP...Billions.of.US...) & 
+         date >= as.Date("1950-01-01") & date <= as.Date("2024-12-31"))
+
+plot_country_trends <- function(df, x_column, y_column, title, x_label, y_label) {
+  ggplot(df, aes_string(x = x_column, y = y_column, color = "country_name", group = "country_name")) +
+    geom_line(size = 1) +
+    geom_point(size = 1.5) +  
+    labs(title = title, x = x_label, y = y_label) +
+    scale_x_date(date_breaks = "10 years", date_labels = "%Y") +  
+    scale_y_continuous(labels = function(x) paste0(x / 1e3, "B")) +  
+    theme_minimal() +
+    theme(legend.title = element_blank())
+}
+
+
+
+advanced_economies <- combined_gdp_data %>%
+  filter(country_name %in% c("United States", "China", "Japan", "Italy", "South Korea"))
+
+gdp_other_countries <- combined_gdp_data %>%
+  filter(!country_name %in% c("United States", "China", "Japan", "Italy", "South Korea"))
+
+advanced_economies_plot <- plot_country_trends(
+  df = advanced_economies,
+  x_column = "date",             
+  y_column = "GDP...Billions.of.US...",  
+  title = "GDP for USA, China, Japan, Italy, and South Korea",
+  x_label = "Year",
+  y_label = "GDP in Billions of US Dollars"
+)
+
+gdp_other_countries_plot <- plot_country_trends(
+  df = gdp_other_countries,
+  x_column = "date",             
+  y_column = "GDP...Billions.of.US...",  
+  title = "GDP for Other Countries",
+  x_label = "Year",
+  y_label = "GDP in Billions of US Dollars"
+)
+
+print(advanced_economies_plot)
+print(gdp_other_countries_plot)
+
+
+```
+
+population
+```{r}
+
+combined_population_data$date <- as.Date(combined_population_data$date, format = "%Y-%m-%d")
+
+combined_population_data <- combined_population_data %>%
+  filter(!is.na(date) & !is.na(Population) & 
+         date >= as.Date("1950-01-01") & date <= as.Date("2024-12-31"))
+
+china_population_data <- combined_population_data %>%
+  filter(country_name == "China")
+
+rest_of_countries_population_data <- combined_population_data %>%
+  filter(country_name != "China")
+
+plot_country_trends <- function(df, x_column, y_column, title, x_label, y_label) {
+  ggplot(df, aes_string(x = x_column, y = y_column, color = "country_name", group = "country_name")) +
+    geom_line(size = 1) +
+    geom_point(size = 1.5) +  
+    labs(title = title, x = x_label, y = y_label) +
+    scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
+    scale_y_continuous(
+      breaks = seq(0, max(df[[y_column]], na.rm = TRUE), by = 50e6),   
+      labels = function(x) paste0(x / 1e6, "M")  
+    ) +
+    theme_minimal() +
+    theme(legend.title = element_blank())
+}
+
+china_population_plot <- plot_country_trends(
+  df = china_population_data,
+  x_column = "date",             
+  y_column = "Population",      
+  title = "Population for China",
+  x_label = "Year",
+  y_label = "Population (in Millions)"
+)
+
+rest_of_countries_population_plot <- plot_country_trends(
+  df = rest_of_countries_population_data,
+  x_column = "date",             
+  y_column = "Population",      
+  title = "Population for Other Countries",
+  x_label = "Year",
+  y_label = "Population (in Millions)"
+)
+
+print(china_population_plot)
+print(rest_of_countries_population_plot)
+
+
+```
+
+urbanization
+```{r}
+
+combined_urbanization_data$date <- as.Date(combined_urbanization_data$date, format = "%Y-%m-%d")
+
+combined_urbanization_data <- combined_urbanization_data %>%
+  filter(!is.na(date) & !is.na(Urban.Population) & 
+         date >= as.Date("1950-01-01") & date <= as.Date("2024-12-31"))
+china_urbanization_data <- combined_urbanization_data %>%
+  filter(country_name == "China")
+
+japan_usa_urbanization_data <- combined_urbanization_data %>%
+  filter(country_name %in% c("Japan", "United States"))
+
+rest_of_countries_urbanization_data <- combined_urbanization_data %>%
+  filter(!country_name %in% c("China", "Japan", "United States"))
+
+plot_country_trends <- function(df, x_column, y_column, title, x_label, y_label, y_break) {
+  ggplot(df, aes_string(x = x_column, y = y_column, color = "country_name", group = "country_name")) +
+    geom_line(size = 1) +
+    geom_point(size = 1.5) +  
+    labs(title = title, x = x_label, y = y_label) +
+    scale_x_date(date_breaks = "10 years", date_labels = "%Y") +
+    scale_y_continuous(
+      breaks = seq(0, max(df[[y_column]], na.rm = TRUE), by = y_break),  
+      labels = function(x) paste0(x / 1e6, "M")  
+    ) +
+    theme_minimal() +
+    theme(legend.title = element_blank())
+}
+
+china_urban_population_plot <- plot_country_trends(
+  df = china_urbanization_data,
+  x_column = "date",             
+  y_column = "Urban.Population",      
+  title = "Urban Population for China",
+  x_label = "Year",
+  y_label = "Urban Population (in Millions)",
+  y_break = 1e8  
+)
+
+japan_usa_urban_population_plot <- plot_country_trends(
+  df = japan_usa_urbanization_data,
+  x_column = "date",             
+  y_column = "Urban.Population",      
+  title = "Urban Population for Japan and USA",
+  x_label = "Year",
+  y_label = "Urban Population (in Millions)",
+  y_break = 5e7  
+)
+
+rest_of_countries_urban_population_plot <- plot_country_trends(
+  df = rest_of_countries_urbanization_data,
+  x_column = "date",             
+  y_column = "Urban.Population",      
+  title = "Urban Population for Other Countries",
+  x_label = "Year",
+  y_label = "Urban Population (in Millions)",
+  y_break = 1e7 
+)
+
+print(china_urban_population_plot)
+print(japan_usa_urban_population_plot)
+print(rest_of_countries_urban_population_plot)
+
+
+```
+
+```{r}
+library(DBI)
+library(RMySQL)
+
+host <- "database-1.cdyqsq4eynri.us-east-2.rds.amazonaws.com"
+port <- 3306
+dbname <- "Project_3"
+user <- "admin"
+password <- "Data607_Project3"
+con <- dbConnect(RMySQL::MySQL(),
+                 dbname = dbname,
+                 host = host,
+                 port = port,
+                 user = user,
+                 password = password)
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+```
+
+
+```{r}
+birth_data <- dbGetQuery(con, "SELECT country_name, year, birth_rate_value AS birth_rate FROM birth_rate")
+
+urbanization_data <- dbGetQuery(con, "SELECT country_name, year, urban_population_value FROM urbanization")
+
+merged_data <- birth_data %>%
+  left_join(urbanization_data, by = c("country_name", "year"))
+
+merged_data <- na.omit(merged_data)
+```
+
+
+```{r}
+country_models <- merged_data %>%
+  group_by(country_name) %>%
+  do(model = lm(birth_rate ~ urban_population_value, data = .))
+
+model_summaries <- country_models %>%
+  summarise(
+    country_name,
+    model_summary = list(summary(model))
+  )
+
+for (i in 1:nrow(model_summaries)) {
+  cat("Country:", model_summaries$country_name[i], "\n")
+  print(model_summaries$model_summary[[i]])
+  cat("\n")
+}
+
+urban_coefficients_df <- country_models %>%
+  summarise(
+    country_name,
+    coefficient = coef(summary(model))["urban_population_value", "Estimate"]
+  )
+```
+
+```{r}
+print(urban_coefficients_df   )
+```
+
+
+```{r}
+ggplot(urban_coefficients_df, aes(x = reorder(country_name, coefficient), y = coefficient)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  coord_flip() +  # Flip coordinates for better visibility
+  labs(title = "Effect of Urbanization on Birth Rate by Country",
+       x = "Country",
+       y = "Coefficient of Urban Population") +
+  theme_minimal()
+```
+
+```{r}
+death_data <- dbGetQuery(con, "SELECT country_name, year, death_rate_value AS death_rate FROM death_rate")
+
+merged_data <- birth_data %>%
+  left_join(death_data, by = c("country_name", "year"))
+
+merged_data <- na.omit(merged_data)
+```
+
+```{r}
+country_models <- merged_data %>%
+  group_by(country_name) %>%
+  do(model = lm(birth_rate ~ death_rate, data = .))
+
+model_summaries <- country_models %>%
+  summarise(
+    country_name,
+    model_summary = list(summary(model))
+  )
+
+for (i in 1:nrow(model_summaries)) {
+  cat("Country:", model_summaries$country_name[i], "\n")
+  print(model_summaries$model_summary[[i]])
+  cat("\n")
+}
+```
+
+```{r}
+death_coefficients_df <- country_models %>%
+  summarise(
+    country_name,
+    coefficient = coef(summary(model))["death_rate", "Estimate"]
+  )
+
+ggplot(death_coefficients_df, aes(x = reorder(country_name, coefficient), y = coefficient)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  coord_flip() +  # Flip coordinates for better visibility
+  labs(title = "Effect of Death Rate on Birth Rate by Country",
+       x = "Country",
+       y = "Coefficient of Death Rate") +
+  theme_minimal()
+```
+
+```{r}
+gdp_data <- dbGetQuery(con, "SELECT country_name, year, gdp_value FROM gdp")
+
+merged_data <- birth_data %>%
+  left_join(gdp_data, by = c("country_name", "year"))
+
+merged_data <- na.omit(merged_data)
+```
+
+
+```{r}
+country_models <- merged_data %>%
+  group_by(country_name) %>%
+  do(model = lm(birth_rate ~ gdp_value, data = .))
+
+model_summaries <- country_models %>%
+  summarise(
+    country_name,
+    model_summary = list(summary(model))
+  )
+
+for (i in 1:nrow(model_summaries)) {
+  cat("Country:", model_summaries$country_name[i], "\n")
+  print(model_summaries$model_summary[[i]])
+  cat("\n")
+}
+```
+
+```{r}
+gdp_coefficients_df <- country_models %>%
+  summarise(
+    country_name,
+    coefficient = coef(summary(model))["gdp_value", "Estimate"]
+  )
+
+ggplot(gdp_coefficients_df, aes(x = reorder(country_name, coefficient), y = coefficient)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  coord_flip() +
+  labs(title = "Effect of GDP on Birth Rate by Country",
+       x = "Country",
+       y = "Coefficient of GDP") +
+  theme_minimal()
+```
+
+```{r}
+fertility_data <- dbGetQuery(con, "SELECT country_name, year, fertility_rate_value AS fertility_rate FROM fertility_rate")
+
+merged_data <- birth_data %>%
+  left_join(fertility_data, by = c("country_name", "year"))
+
+merged_data <- na.omit(merged_data)
+```
+```{r}
+country_models <- merged_data %>%
+  group_by(country_name) %>%
+  do(model = lm(birth_rate ~ fertility_rate, data = .))
+
+model_summaries <- country_models %>%
+  summarise(
+    country_name,
+    model_summary = list(summary(model))
+  )
+
+for (i in 1:nrow(model_summaries)) {
+  cat("Country:", model_summaries$country_name[i], "\n")
+  print(model_summaries$model_summary[[i]])
+  cat("\n")
+}
+
+```
+
+```{r}
+fertility_coefficients_df <- country_models %>%
+  summarise(
+    country_name,
+    coefficient = coef(summary(model))["fertility_rate", "Estimate"]
+  )
+
+ggplot(fertility_coefficients_df, aes(x = reorder(country_name, coefficient), y = coefficient)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  coord_flip() +  # Flip coordinates for better visibility
+  labs(title = "Effect of Fertility Rate on Birth Rate by Country",
+       x = "Country",
+       y = "Coefficient of Fertility Rate") +
+  theme_minimal()
+
+```
+```{r}
+population_data <- dbGetQuery(con, "SELECT country_name, year, population_value AS population FROM population")
+```
+
+```{r}
+merged_data <- birth_data %>%
+  left_join(population_data, by = c("country_name", "year"))
+
+merged_data <- na.omit(merged_data)
+```
+
+```{r}
+country_models <- merged_data %>%
+  group_by(country_name) %>%
+  do(model = lm(birth_rate ~ population, data = .))
+
+model_summaries <- country_models %>%
+  summarise(
+    country_name,
+    model_summary = list(summary(model))
+  )
+
+population_coefficients_df <- country_models %>%
+  summarise(
+    country_name,
+    coefficient = coef(summary(model))["population", "Estimate"]
+  )
+
+for (i in 1:nrow(model_summaries)) {
+  cat("Country:", model_summaries$country_name[i], "\n")
+  print(model_summaries$model_summary[[i]])
+  cat("\n")
+}
+
+```
+
+```{r}
+positive_coefficients <- population_coefficients_df %>%
+  filter(coefficient > 0)
+
+ggplot(positive_coefficients, aes(x = reorder(country_name, coefficient), y = coefficient)) +
+  geom_bar(stat = "identity", fill = "lightgreen") +
+  coord_flip() +
+  labs(title = "Positive Effect of Population on Birth Rate",
+       x = "Country",
+       y = "Coefficient of Population") +
+  theme_minimal()
+
+negative_coefficients <- population_coefficients_df %>%
+  filter(coefficient <= 0)
+
+ggplot(negative_coefficients, aes(x = reorder(country_name, coefficient), y = coefficient)) +
+  geom_bar(stat = "identity", fill = "salmon") +
+  coord_flip() +
+  labs(title = "Negative Effect of Population on Birth Rate",
+       x = "Country",
+       y = "Coefficient of Population") +
+  theme_minimal()
+
+```
+```
+

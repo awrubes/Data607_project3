@@ -1,0 +1,23 @@
+This document provides instructions for accessing and interacting with the Project_3 database hosted on Amazon RDS. The database is structured as shown in the provided ER diagram and contains tables related to demographic data like birth rates, death rates, population, GDP, fertility rates, and urbanization.
+
+Database Credentials
+Username: admin
+Password: Data607_Project3
+Endpoint: database-1.cdyqsq4eynri.us-east-2.rds.amazonaws.com
+Database: Project_3
+Port: 3306
+
+Connecting to the Database
+Using DBeaver (or any MySQL client)
+Open DBeaver or any other MySQL client.
+Choose New Database Connection.
+Select MySQL.
+
+In the connection window, enter the following details:
+Host: database-1.cdyqsq4eynri.us-east-2.rds.amazonaws.com
+Database: Project_3
+Port: 3306
+Username: admin
+Password: Data607_Project3
+Click Test Connection to ensure you can connect.
+Once successful, click Finish to save the connection.
