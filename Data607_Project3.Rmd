@@ -1,8 +1,7 @@
 ---
-title: "Data607_Project3_Part1"
+title: "Data607_Project3"
 author: "aw"
 date: "`r Sys.Date()`"
-output:
 output: html_document
 ---
 
@@ -22,7 +21,7 @@ Niger, Japan, US, China, Benin, Angola, Czech Republic, Italy, Egypt, Bangladesh
 ## Group Members, Collaboration Tools, Data Sources
 
 **Project Group:**\
-Ahmed Hassan, Zach Rose, Amish Rasheed, Robert Green, Allie Wrubel
+Ahmed Hassan, Zach Rose, Amish Rasheed, Allie Wrubel
 
 **Collaboration Tools:\
 **To facilitate communication and efficient teamwork, we will utilize several collaboration tools throughout the project. **Slack** will serve as our primary communication platform, allowing for real-time discussions and file sharing. **Email** for formal communication and sharing larger documents or updates. **Google Colab** for collaboratively developing and running R scripts. All files will be stored in a shared public repository on GitHub \<[https://github.com/awrubes/Data607_project3](https://github.com/awrubes/Data607_project3/tree/main){.uri}\>.
@@ -654,5 +653,5 @@ ggplot(negative_coefficients, aes(x = reorder(country_name, coefficient), y = co
   theme_minimal()
 
 ```
-```
+
 
